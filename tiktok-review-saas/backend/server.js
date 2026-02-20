@@ -11,6 +11,8 @@ const PORT = Number(process.env.PORT || 4000)
 const JWT_SECRET = process.env.JWT_SECRET
 const DATABASE_URL = process.env.DATABASE_URL
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN
+const RELEASE_VERSION = process.env.RELEASE_VERSION || process.env.npm_package_version || "1.0.0";
+const RELEASE_NAME = process.env.RELEASE_NAME || "Final Release";
 
 if (!JWT_SECRET) throw new Error("JWT_SECRET is required")
 if (!DATABASE_URL) throw new Error("DATABASE_URL is required")
@@ -95,6 +97,36 @@ async function ensureWallet(userId) {
   return wallet.rows[0]
 }
 
+app.get("/health", asyncHandler(async (_req, res) => {
+  const db = await pool.query("SELECT NOW() AS now")
+  res.json({
+    ok: true,
+    release: { version: RELEASE_VERSION, name: RELEASE_NAME },
+    database: { ok: true, now: db.rows[0].now }
+  })
+}))
+
+app.get("/release/info", (_req, res) => {
+  res.json({
+    release: {
+      version: RELEASE_VERSION,
+      name: RELEASE_NAME,
+      stage: "production"
+    },
+    features: [
+      "Automated installer",
+      "Wallet and deposits",
+      "Master meta dashboard",
+      "Deep Learn + n8n automation",
+      "Admin and rental control panels"
+    ],
+    endpoints: {
+      health: "/health",
+      release_info: "/release/info",
+      meta_dashboard: "/admin/master-meta-dashboard",
+      wallet: "/wallet"
+    }
+  })
 app.get("/health", (_req, res) => {
   res.json({ ok: true })
 })
@@ -120,6 +152,8 @@ app.post("/register", authRateLimit, asyncHandler(async (req, res) => {
       [email, hash, role]
     )
     newUser = inserted.rows[0]
+  try {
+    await pool.query("INSERT INTO users (email,password_hash,role) VALUES ($1,$2,$3)", [email, hash, role])
   } catch (error) {
     if (error.code === "23505") return res.status(409).json({ error: "email already registered" })
     throw error
@@ -261,6 +295,25 @@ app.post("/wallet/deposit", auth, asyncHandler(async (req, res) => {
       [amount, wallet.id]
     )
 
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return res.status(400).json({ error: "amount must be > 0" })
+  }
+  if (amount > 1_000_000) {
+    return res.status(400).json({ error: "amount too large" })
+  }
+
+  const wallet = await ensureWallet(req.user.id)
+  const client = await pool.connect()
+
+  try {
+    await client.query("BEGIN")
+
+    const updated = await client.query(
+      "UPDATE wallet_accounts SET balance = balance + $1, updated_at = NOW() WHERE id=$2 RETURNING *",
+      [amount, wallet.id]
+    )
+
     const tx = await client.query(
       `INSERT INTO wallet_transactions (wallet_id, user_id, tx_type, amount, status, note, metadata)
        VALUES ($1,$2,'deposit',$3,'completed',$4,$5)
@@ -286,6 +339,12 @@ app.get("/wallet/transactions", auth, asyncHandler(async (req, res) => {
   )
   res.json(data.rows)
 }))
+
+app.get("/rent/plans", auth, asyncHandler(async (_req, res) => {
+  const data = await pool.query("SELECT code, name, monthly_price, max_video_jobs, perks FROM rental_plans WHERE active=TRUE ORDER BY monthly_price ASC")
+  res.json(data.rows)
+}))
+
 
 app.get("/rent/plans", auth, asyncHandler(async (_req, res) => {
   const data = await pool.query("SELECT code, name, monthly_price, max_video_jobs, perks FROM rental_plans WHERE active=TRUE ORDER BY monthly_price ASC")
@@ -438,6 +497,11 @@ app.post("/showcase/upload", auth, asyncHandler(async (req, res) => {
   const videoJobId = parsePositiveInt(req.body.videoJobId, "videoJobId")
   const caption = safeText(req.body.caption || "", 500)
 
+
+app.post("/showcase/upload", auth, asyncHandler(async (req, res) => {
+  const videoJobId = parsePositiveInt(req.body.videoJobId, "videoJobId")
+  const caption = safeText(req.body.caption || "", 500)
+
   const video = await pool.query("SELECT id FROM video_jobs WHERE id=$1 AND user_id=$2", [videoJobId, req.user.id])
   if (!video.rows.length) return res.status(404).json({ error: "Video job not found" })
 
@@ -534,6 +598,7 @@ app.get("/admin/master-meta-dashboard", auth, adminOnly, asyncHandler(async (_re
   res.json(await getMetaDashboardPayload())
 }))
 
+
 app.get("/admin/users", auth, adminOnly, asyncHandler(async (_req, res) => {
   const data = await pool.query("SELECT id, email, role, plan, created_at FROM users ORDER BY created_at DESC")
   res.json(data.rows)
@@ -568,4 +633,5 @@ app.use((error, _req, res, _next) => {
   res.status(status).json({ error: status >= 500 ? "Internal server error" : error.message })
 })
 
+app.listen(PORT, () => console.log(`Backend running on ${PORT} | ${RELEASE_NAME} v${RELEASE_VERSION}`))
 app.listen(PORT, () => console.log(`Backend running on ${PORT}`))

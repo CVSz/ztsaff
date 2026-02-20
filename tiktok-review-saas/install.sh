@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPOSE_FILE="$ROOT_DIR/docker-compose.yml"
+ENV_FILE="$ROOT_DIR/.env"
 
 if [[ ! -f "$COMPOSE_FILE" ]]; then
   echo "❌ docker-compose.yml not found in $ROOT_DIR"
@@ -57,6 +58,39 @@ start_stack() {
     $SUDO docker compose -f "$COMPOSE_FILE" up -d --build
   else
     $SUDO docker-compose -f "$COMPOSE_FILE" up -d --build
+generate_env_file() {
+  if [[ -f "$ENV_FILE" ]]; then
+    echo "✅ .env already exists"
+    return
+  fi
+
+  echo "🔐 Generating .env for final release..."
+  if command -v openssl >/dev/null 2>&1; then
+    JWT_SECRET_VALUE="$(openssl rand -hex 32)"
+    ADMIN_KEY_VALUE="$(openssl rand -hex 16)"
+  else
+    JWT_SECRET_VALUE="$(date +%s%N | sha256sum | cut -d' ' -f1)"
+    ADMIN_KEY_VALUE="$(date +%s%N | sha256sum | cut -c1-32)"
+  fi
+
+  cat > "$ENV_FILE" <<EOT
+DATABASE_URL=postgresql://saas:saas@postgres:5432/tiktok_saas
+JWT_SECRET=${JWT_SECRET_VALUE}
+ADMIN_BOOTSTRAP_KEY=${ADMIN_KEY_VALUE}
+FRONTEND_ORIGIN=http://localhost:3000
+RELEASE_VERSION=1.0.0
+RELEASE_NAME=Final Release
+EOT
+
+  echo "✅ Created $ENV_FILE"
+  echo "Admin bootstrap key: ${ADMIN_KEY_VALUE}"
+}
+
+start_stack() {
+  if docker compose version >/dev/null 2>&1; then
+    docker compose -f "$COMPOSE_FILE" up -d --build
+  else
+    docker-compose -f "$COMPOSE_FILE" up -d --build
   fi
 }
 
@@ -64,6 +98,7 @@ main() {
   echo "🚀 Automated installer starting..."
   install_docker
   install_compose_fallback
+  generate_env_file
 
   $SUDO systemctl enable docker || true
   $SUDO systemctl start docker || true

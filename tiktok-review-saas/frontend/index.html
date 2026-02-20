@@ -60,6 +60,7 @@
       <span class="chip">n8n Upgrade</span>
       <span class="chip">Wallet</span>
       <span class="chip">Master Meta Dashboard</span>
+      <span class="chip">Final Release v1.0.0</span>
     </div>
   </div>
 
@@ -73,10 +74,23 @@
       </div>
 
       <div class="card">
+        <h2 class="section-title">Release Control</h2>
+        <p class="hint">Final-release checks for backend availability and published release metadata.</p>
+        <div class="row">
+          <button onclick="loadReleaseInfo()">Release Info</button>
+          <button onclick="checkHealth()">Health Check</button>
+        </div>
+      </div>
+
+      <div class="card">
         <h2 class="section-title">1) Auth</h2>
         <div class="row">
           <input id="email" placeholder="email" value="demo@example.com" />
           <input id="password" placeholder="password (min 8 chars)" type="password" value="12345678" />
+        <h2 class="section-title">1) Auth</h2>
+        <div class="row">
+          <input id="email" placeholder="email" value="demo@example.com" />
+          <input id="password" placeholder="password" type="password" value="123456" />
         </div>
         <input id="adminKey" placeholder="admin bootstrap key (optional for admin register)" />
         <div class="row">
@@ -140,6 +154,7 @@
 
       <div class="card">
         <h2 class="section-title">5) Deep Learn + n8n Upgrade</h2>
+        <h2 class="section-title">4) Deep Learn + n8n Upgrade</h2>
         <p class="hint">Create a richer AI prompt strategy and push payload to your n8n webhook for downstream automations.</p>
         <select id="learningDepth">
           <option value="normal">Normal learning</option>
@@ -158,6 +173,7 @@
 
       <div class="card">
         <h2 class="section-title">6) Admin Control Panel</h2>
+        <h2 class="section-title">5) Admin Control Panel</h2>
         <div class="row">
           <button onclick="loadAdminDashboard()">Admin Dashboard</button>
           <button onclick="loadAdminUsers()">List Users</button>
@@ -166,6 +182,7 @@
           <button onclick="loadAdminRentals()">List All Rentals</button>
           <button class="warn" onclick="loadMasterMetaDashboard()">Master Meta Dashboard</button>
         </div>
+        <button onclick="loadAdminRentals()">List All Rentals</button>
         <div class="row">
           <input id="targetUserId" placeholder="target user id" />
           <select id="targetRole">
@@ -246,6 +263,8 @@
     async function loadProducts() { try { show(await request("/products")); return true } catch (e) { show(e); return false } }
     async function loadVideoJobs() { try { show(await request("/video-jobs")); return true } catch (e) { show(e); return false } }
     async function loadUploads() { try { show(await request("/showcase/uploads")); return true } catch (e) { show(e); return false } }
+    async function loadReleaseInfo() { try { show(await request("/release/info")); return true } catch (e) { show(e); return false } }
+    async function checkHealth() { try { show(await request("/health")); return true } catch (e) { show(e); return false } }
 
     async function subscribePlan() {
       try {
@@ -300,6 +319,16 @@
         } catch (e2) {
           show(e2)
           return false
+        show(await request("/admin/master-meta-dashboard"));
+        return true;
+      } catch (e) {
+        updateStatus("Master meta dashboard failed, trying fallback meta dashboard...", true);
+        try {
+          show(await request("/admin/meta-dashboard"));
+          return true;
+        } catch (e2) {
+          show(e2);
+          return false;
         }
       }
     }
@@ -328,6 +357,66 @@
       }
 
       let webhookUrl
+      try {
+        webhookUrl = new URL(webhook)
+      } catch (_e) {
+        updateStatus("invalid n8n webhook URL", true)
+        show({ error: "invalid n8n webhook URL" })
+        return
+      }
+
+      const isLocal = ["localhost", "127.0.0.1"].includes(webhookUrl.hostname)
+      if (webhookUrl.protocol !== "https:" && !isLocal) {
+        updateStatus("n8n webhook must use HTTPS", true)
+        show({ error: "n8n webhook must use HTTPS" })
+        return
+      }
+
+      const payload = {
+        source: "tiktok-review-saas-frontend",
+        tag: n8nTag.value.trim() || "tiktok-review-automation",
+        timestamp: new Date().toISOString(),
+        user: { email: email.value },
+        context: {
+          learningDepth: learningDepth.value,
+          learningPrompt: learningPrompt.value,
+          planCode: planCode.value,
+          planMonths: Number(planMonths.value || 1),
+          caption: caption.value
+        }
+      }
+
+      try {
+      try {
+        webhookUrl = new URL(webhook)
+      } catch (_e) {
+        updateStatus("invalid n8n webhook URL", true)
+        show({ error: "invalid n8n webhook URL" })
+        return
+      }
+
+      const isLocal = ["localhost", "127.0.0.1"].includes(webhookUrl.hostname)
+      if (webhookUrl.protocol !== "https:" && !isLocal) {
+        updateStatus("n8n webhook must use HTTPS", true)
+        show({ error: "n8n webhook must use HTTPS" })
+        return
+      }
+
+      const payload = {
+        source: "tiktok-review-saas-frontend",
+        tag: n8nTag.value.trim() || "tiktok-review-automation",
+        timestamp: new Date().toISOString(),
+        user: { email: email.value },
+        context: {
+          learningDepth: learningDepth.value,
+          learningPrompt: learningPrompt.value,
+          planCode: planCode.value,
+          planMonths: Number(planMonths.value || 1),
+          caption: caption.value
+        }
+      }
+
+      try {
       try {
         webhookUrl = new URL(webhook)
       } catch (_e) {
@@ -392,6 +481,46 @@
     }
 
     const fields = ["email", "planCode", "planMonths", "caption", "productsJson", "learningDepth", "learningPrompt", "n8nWebhook", "n8nTag", "depositAmount", "depositNote"]
+    }
+
+    async function runDemoFlow() {
+      updateStatus("Running demo flow...")
+      await loadReleaseInfo()
+      const registered = await registerUser();
+      if (!registered) updateStatus("Registration failed, trying login...", true);
+
+      const loggedIn = await loginUser()
+      if (!loggedIn) {
+        updateStatus("Demo flow stopped at login", true)
+        return
+      }
+
+      await listRentPlans()
+      await loadUserDashboard()
+      await loadWallet()
+      updateStatus("Demo flow completed")
+    }
+
+    const fields = ["email", "planCode", "planMonths", "caption", "productsJson", "learningDepth", "learningPrompt", "n8nWebhook", "n8nTag", "depositAmount", "depositNote"]
+    }
+
+    async function runDemoFlow() {
+      updateStatus("Running demo flow...")
+      const registered = await registerUser()
+      if (!registered) updateStatus("Register skipped/failed, trying login...")
+
+      const loggedIn = await loginUser()
+      if (!loggedIn) {
+        updateStatus("Demo flow stopped at login", true)
+        return
+      }
+
+      await listRentPlans()
+      await loadUserDashboard()
+      updateStatus("Demo flow completed")
+    }
+
+    const fields = ["email", "planCode", "planMonths", "caption", "productsJson", "learningDepth", "learningPrompt", "n8nWebhook", "n8nTag"]
     fields.forEach((id) => {
       const el = document.getElementById(id)
       const saved = localStorage.getItem(`ui:${id}`)
