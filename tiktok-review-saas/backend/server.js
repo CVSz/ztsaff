@@ -295,6 +295,25 @@ app.post("/wallet/deposit", auth, asyncHandler(async (req, res) => {
       [amount, wallet.id]
     )
 
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return res.status(400).json({ error: "amount must be > 0" })
+  }
+  if (amount > 1_000_000) {
+    return res.status(400).json({ error: "amount too large" })
+  }
+
+  const wallet = await ensureWallet(req.user.id)
+  const client = await pool.connect()
+
+  try {
+    await client.query("BEGIN")
+
+    const updated = await client.query(
+      "UPDATE wallet_accounts SET balance = balance + $1, updated_at = NOW() WHERE id=$2 RETURNING *",
+      [amount, wallet.id]
+    )
+
     const tx = await client.query(
       `INSERT INTO wallet_transactions (wallet_id, user_id, tx_type, amount, status, note, metadata)
        VALUES ($1,$2,'deposit',$3,'completed',$4,$5)

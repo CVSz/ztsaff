@@ -310,6 +310,15 @@
     async function loadAdminRentals() { try { show(await request("/admin/rentals")); return true } catch (e) { show(e); return false } }
     async function loadMasterMetaDashboard() {
       try {
+        show(await request("/admin/master-meta-dashboard"))
+        return true
+      } catch (e) {
+        try {
+          show(await request("/admin/meta-dashboard"))
+          return true
+        } catch (e2) {
+          show(e2)
+          return false
         show(await request("/admin/master-meta-dashboard"));
         return true;
       } catch (e) {
@@ -408,6 +417,36 @@
       }
 
       try {
+      try {
+        webhookUrl = new URL(webhook)
+      } catch (_e) {
+        updateStatus("invalid n8n webhook URL", true)
+        show({ error: "invalid n8n webhook URL" })
+        return
+      }
+
+      const isLocal = ["localhost", "127.0.0.1"].includes(webhookUrl.hostname)
+      if (webhookUrl.protocol !== "https:" && !isLocal) {
+        updateStatus("n8n webhook must use HTTPS", true)
+        show({ error: "n8n webhook must use HTTPS" })
+        return
+      }
+
+      const payload = {
+        source: "tiktok-review-saas-frontend",
+        tag: n8nTag.value.trim() || "tiktok-review-automation",
+        timestamp: new Date().toISOString(),
+        user: { email: email.value },
+        context: {
+          learningDepth: learningDepth.value,
+          learningPrompt: learningPrompt.value,
+          planCode: planCode.value,
+          planMonths: Number(planMonths.value || 1),
+          caption: caption.value
+        }
+      }
+
+      try {
         updateStatus("POST n8n webhook ...")
         const controller = new AbortController()
         const timeoutId = setTimeout(() => controller.abort(), 10000)
@@ -422,6 +461,26 @@
         const details = e.name === "AbortError" ? "request timeout after 10s" : e.message
         show({ error: "n8n webhook failed", details, payload })
       }
+    }
+
+    async function runDemoFlow() {
+      updateStatus("Running demo flow...")
+      const registered = await registerUser()
+      if (!registered) updateStatus("Register skipped/failed, trying login...")
+
+      const loggedIn = await loginUser()
+      if (!loggedIn) {
+        updateStatus("Demo flow stopped at login", true)
+        return
+      }
+
+      await listRentPlans()
+      await loadUserDashboard()
+      await loadWallet()
+      updateStatus("Demo flow completed")
+    }
+
+    const fields = ["email", "planCode", "planMonths", "caption", "productsJson", "learningDepth", "learningPrompt", "n8nWebhook", "n8nTag", "depositAmount", "depositNote"]
     }
 
     async function runDemoFlow() {
