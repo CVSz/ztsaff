@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI TikTok Review Studio</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 1080px; margin: 0 auto; padding: 24px; background: #f5f7fb; }
+    .card { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+    input, textarea, button, select { width: 100%; margin-top: 8px; padding: 10px; box-sizing: border-box; }
+    button { cursor: pointer; background: #111; color: #fff; border: 0; border-radius: 6px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .section-title { margin: 0; }
+    pre { background: #111; color: #0f0; padding: 12px; overflow: auto; border-radius: 6px; min-height: 180px; }
+  </style>
+</head>
+<body>
+  <h1>AI TikTok Review Studio</h1>
+  <p>Now includes <b>User Control Panel</b>, <b>Admin Control Panel</b>, and <b>Rent feature</b> for subscription plans.</p>
+
+  <div class="card">
+    <h2 class="section-title">1) Auth</h2>
+    <div class="row">
+      <input id="email" placeholder="email" value="demo@example.com" />
+      <input id="password" placeholder="password" type="password" value="123456" />
+    </div>
+    <input id="adminKey" placeholder="admin bootstrap key (optional for admin register)" />
+    <div class="row">
+      <button onclick="registerUser()">Register</button>
+      <button onclick="loginUser()">Login</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 class="section-title">2) Rent feature (User)</h2>
+    <div class="row">
+      <button onclick="listRentPlans()">List Rent Plans</button>
+      <button onclick="loadMyRentals()">My Rentals</button>
+    </div>
+    <div class="row">
+      <input id="planCode" placeholder="plan code: starter | growth | pro" value="starter" />
+      <input id="planMonths" type="number" min="1" value="1" placeholder="months" />
+    </div>
+    <button onclick="subscribePlan()">Subscribe Plan (Rent)</button>
+  </div>
+
+  <div class="card">
+    <h2 class="section-title">3) User Control Panel</h2>
+    <div class="row">
+      <button onclick="loadUserDashboard()">Load User Dashboard</button>
+      <button onclick="loadProducts()">My Products</button>
+    </div>
+    <textarea id="productsJson" rows="6">[
+  {"id":"sku001","title":"Vitamin C Serum","category":"beauty","price":199,"currency":"THB"},
+  {"id":"sku002","title":"Mini Blender","category":"kitchen","price":499,"currency":"THB"}
+]</textarea>
+    <button onclick="importFeed()">Import TikTok Shop Affiliate Feed</button>
+    <div class="row">
+      <input id="productDbId" placeholder="Product DB id (e.g. 1)" />
+      <input id="videoJobId" placeholder="Video Job id" />
+    </div>
+    <div class="row">
+      <button onclick="generateVideo()">Generate Video Package</button>
+      <button onclick="loadVideoJobs()">My Video Jobs</button>
+    </div>
+    <input id="caption" placeholder="caption" value="ของดีบอกต่อจาก TikTok Shop" />
+    <div class="row">
+      <button onclick="uploadShowcase()">Upload to Showcase</button>
+      <button onclick="loadUploads()">My Showcase Uploads</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 class="section-title">4) Admin Control Panel</h2>
+    <div class="row">
+      <button onclick="loadAdminDashboard()">Admin Dashboard</button>
+      <button onclick="loadAdminUsers()">List Users</button>
+    </div>
+    <button onclick="loadAdminRentals()">List All Rentals</button>
+    <div class="row">
+      <input id="targetUserId" placeholder="target user id" />
+      <select id="targetRole">
+        <option value="user">user</option>
+        <option value="admin">admin</option>
+      </select>
+    </div>
+    <button onclick="changeUserRole()">Change User Role</button>
+  </div>
+
+  <div class="card">
+    <h2 class="section-title">Output</h2>
+    <pre id="out">Ready</pre>
+  </div>
+
+  <script>
+    const API = "http://localhost:4000"
+    let token = ""
+
+    function show(data) {
+      document.getElementById("out").textContent = JSON.stringify(data, null, 2)
+    }
+
+    async function request(path, method = "GET", body) {
+      const headers = { "Content-Type": "application/json" }
+      if (token) headers.Authorization = `Bearer ${token}`
+      const r = await fetch(`${API}${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined })
+      let data
+      try {
+        data = await r.json()
+      } catch (_e) {
+        data = { error: "Invalid JSON response" }
+      }
+      if (!r.ok) throw data
+      return data
+    }
+
+    async function registerUser() {
+      try {
+        const body = { email: email.value, password: password.value }
+        if (adminKey.value.trim()) body.adminKey = adminKey.value.trim()
+        show(await request("/register", "POST", body))
+      } catch (e) { show(e) }
+    }
+
+    async function loginUser() {
+      try {
+        const data = await request("/login", "POST", { email: email.value, password: password.value })
+        token = data.token
+        show({ message: "login success", role: data.role, token })
+      } catch (e) { show(e) }
+    }
+
+    async function listRentPlans() { try { show(await request("/rent/plans")) } catch (e) { show(e) } }
+    async function loadMyRentals() { try { show(await request("/me/rentals")) } catch (e) { show(e) } }
+    async function loadUserDashboard() { try { show(await request("/user/dashboard")) } catch (e) { show(e) } }
+    async function loadProducts() { try { show(await request("/products")) } catch (e) { show(e) } }
+    async function loadVideoJobs() { try { show(await request("/video-jobs")) } catch (e) { show(e) } }
+    async function loadUploads() { try { show(await request("/showcase/uploads")) } catch (e) { show(e) } }
+
+    async function subscribePlan() {
+      try {
+        show(await request("/rent/subscribe", "POST", {
+          planCode: planCode.value.trim(),
+          months: Number(planMonths.value || 1)
+        }))
+      } catch (e) { show(e) }
+    }
+
+    async function importFeed() {
+      try {
+        const products = JSON.parse(productsJson.value)
+        show(await request("/product-feed/import", "POST", { feedName: "Demo Feed", products }))
+      } catch (e) { show(e) }
+    }
+
+    async function generateVideo() {
+      try {
+        show(await request("/video/generate-from-feed", "POST", { productDbId: Number(productDbId.value) }))
+      } catch (e) { show(e) }
+    }
+
+    async function uploadShowcase() {
+      try {
+        show(await request("/showcase/upload", "POST", {
+          videoJobId: Number(videoJobId.value),
+          caption: caption.value
+        }))
+      } catch (e) { show(e) }
+    }
+
+    async function loadAdminDashboard() { try { show(await request("/admin/dashboard")) } catch (e) { show(e) } }
+    async function loadAdminUsers() { try { show(await request("/admin/users")) } catch (e) { show(e) } }
+    async function loadAdminRentals() { try { show(await request("/admin/rentals")) } catch (e) { show(e) } }
+
+    async function changeUserRole() {
+      try {
+        show(await request(`/admin/users/${Number(targetUserId.value)}/role`, "POST", { role: targetRole.value }))
+      } catch (e) { show(e) }
+    }
+  </script>
+</body>
+</html>
