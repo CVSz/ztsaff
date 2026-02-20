@@ -303,15 +303,16 @@
     async function loadAdminRentals() { try { show(await request("/admin/rentals")); return true } catch (e) { show(e); return false } }
     async function loadMasterMetaDashboard() {
       try {
-        show(await request("/admin/master-meta-dashboard"))
-        return true
+        show(await request("/admin/master-meta-dashboard"));
+        return true;
       } catch (e) {
+        updateStatus("Master meta dashboard failed, trying fallback meta dashboard...", true);
         try {
-          show(await request("/admin/meta-dashboard"))
-          return true
+          show(await request("/admin/meta-dashboard"));
+          return true;
         } catch (e2) {
-          show(e2)
-          return false
+          show(e2);
+          return false;
         }
       }
     }
