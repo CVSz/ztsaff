@@ -11,6 +11,8 @@ const PORT = Number(process.env.PORT || 4000)
 const JWT_SECRET = process.env.JWT_SECRET
 const DATABASE_URL = process.env.DATABASE_URL
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN
+const RELEASE_VERSION = process.env.RELEASE_VERSION || process.env.npm_package_version || "1.0.0";
+const RELEASE_NAME = process.env.RELEASE_NAME || "Final Release";
 
 if (!JWT_SECRET) throw new Error("JWT_SECRET is required")
 if (!DATABASE_URL) throw new Error("DATABASE_URL is required")
@@ -80,6 +82,51 @@ function asyncHandler(handler) {
   return (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next)
 }
 
+async function ensureWallet(userId) {
+  await pool.query(
+    `INSERT INTO wallet_accounts (user_id, balance, currency)
+     VALUES ($1, 0, 'THB')
+     ON CONFLICT (user_id) DO NOTHING`,
+    [userId]
+  )
+
+  const wallet = await pool.query(
+    "SELECT id, user_id, balance, currency, updated_at, created_at FROM wallet_accounts WHERE user_id=$1",
+    [userId]
+  )
+  return wallet.rows[0]
+}
+
+app.get("/health", asyncHandler(async (_req, res) => {
+  const db = await pool.query("SELECT NOW() AS now")
+  res.json({
+    ok: true,
+    release: { version: RELEASE_VERSION, name: RELEASE_NAME },
+    database: { ok: true, now: db.rows[0].now }
+  })
+}))
+
+app.get("/release/info", (_req, res) => {
+  res.json({
+    release: {
+      version: RELEASE_VERSION,
+      name: RELEASE_NAME,
+      stage: "production"
+    },
+    features: [
+      "Automated installer",
+      "Wallet and deposits",
+      "Master meta dashboard",
+      "Deep Learn + n8n automation",
+      "Admin and rental control panels"
+    ],
+    endpoints: {
+      health: "/health",
+      release_info: "/release/info",
+      meta_dashboard: "/admin/master-meta-dashboard",
+      wallet: "/wallet"
+    }
+  })
 app.get("/health", (_req, res) => {
   res.json({ ok: true })
 })
@@ -98,12 +145,21 @@ app.post("/register", authRateLimit, asyncHandler(async (req, res) => {
   const role = adminKey && adminKey === process.env.ADMIN_BOOTSTRAP_KEY ? "admin" : "user"
   const hash = await bcrypt.hash(password, 12)
 
+  let newUser
+  try {
+    const inserted = await pool.query(
+      "INSERT INTO users (email,password_hash,role) VALUES ($1,$2,$3) RETURNING id",
+      [email, hash, role]
+    )
+    newUser = inserted.rows[0]
   try {
     await pool.query("INSERT INTO users (email,password_hash,role) VALUES ($1,$2,$3)", [email, hash, role])
   } catch (error) {
     if (error.code === "23505") return res.status(409).json({ error: "email already registered" })
     throw error
   }
+
+  await ensureWallet(newUser.id)
 
   res.json({ message: "Registered", role })
 }))
@@ -199,15 +255,77 @@ app.get("/user/dashboard", auth, asyncHandler(async (req, res) => {
     )
   ])
 
+  const wallet = await ensureWallet(req.user.id)
+
   res.json({
     stats: {
       product_count: products.rows[0].count,
       video_job_count: videoJobs.rows[0].count,
       upload_count: uploads.rows[0].count
     },
-    active_rental: activeRental.rows[0] ?? null
+    active_rental: activeRental.rows[0] ?? null,
+    wallet
   })
 }))
+
+app.get("/wallet", auth, asyncHandler(async (req, res) => {
+  const wallet = await ensureWallet(req.user.id)
+  res.json(wallet)
+}))
+
+app.post("/wallet/deposit", auth, asyncHandler(async (req, res) => {
+  const amount = Number(req.body.amount)
+  const note = safeText(req.body.note || "manual-topup", 255)
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return res.status(400).json({ error: "amount must be > 0" })
+  }
+  if (amount > 1_000_000) {
+    return res.status(400).json({ error: "amount too large" })
+  }
+
+  const wallet = await ensureWallet(req.user.id)
+  const client = await pool.connect()
+
+  try {
+    await client.query("BEGIN")
+
+    const updated = await client.query(
+      "UPDATE wallet_accounts SET balance = balance + $1, updated_at = NOW() WHERE id=$2 RETURNING *",
+      [amount, wallet.id]
+    )
+
+    const tx = await client.query(
+      `INSERT INTO wallet_transactions (wallet_id, user_id, tx_type, amount, status, note, metadata)
+       VALUES ($1,$2,'deposit',$3,'completed',$4,$5)
+       RETURNING *`,
+      [wallet.id, req.user.id, amount, note, JSON.stringify({ source: "user_deposit" })]
+    )
+
+    await client.query("COMMIT")
+    res.json({ message: "Deposit success", wallet: updated.rows[0], transaction: tx.rows[0] })
+  } catch (error) {
+    await client.query("ROLLBACK")
+    throw error
+  } finally {
+    client.release()
+  }
+}))
+
+app.get("/wallet/transactions", auth, asyncHandler(async (req, res) => {
+  const wallet = await ensureWallet(req.user.id)
+  const data = await pool.query(
+    "SELECT * FROM wallet_transactions WHERE wallet_id=$1 ORDER BY created_at DESC LIMIT 100",
+    [wallet.id]
+  )
+  res.json(data.rows)
+}))
+
+app.get("/rent/plans", auth, asyncHandler(async (_req, res) => {
+  const data = await pool.query("SELECT code, name, monthly_price, max_video_jobs, perks FROM rental_plans WHERE active=TRUE ORDER BY monthly_price ASC")
+  res.json(data.rows)
+}))
+
 
 app.get("/rent/plans", auth, asyncHandler(async (_req, res) => {
   const data = await pool.query("SELECT code, name, monthly_price, max_video_jobs, perks FROM rental_plans WHERE active=TRUE ORDER BY monthly_price ASC")
@@ -360,6 +478,11 @@ app.post("/showcase/upload", auth, asyncHandler(async (req, res) => {
   const videoJobId = parsePositiveInt(req.body.videoJobId, "videoJobId")
   const caption = safeText(req.body.caption || "", 500)
 
+
+app.post("/showcase/upload", auth, asyncHandler(async (req, res) => {
+  const videoJobId = parsePositiveInt(req.body.videoJobId, "videoJobId")
+  const caption = safeText(req.body.caption || "", 500)
+
   const video = await pool.query("SELECT id FROM video_jobs WHERE id=$1 AND user_id=$2", [videoJobId, req.user.id])
   if (!video.rows.length) return res.status(404).json({ error: "Video job not found" })
 
@@ -398,6 +521,65 @@ app.get("/admin/dashboard", auth, adminOnly, asyncHandler(async (_req, res) => {
   })
 }))
 
+async function getMetaDashboardPayload() {
+  const [
+    users,
+    activeRentals,
+    jobs,
+    uploads,
+    rentalsRevenue,
+    walletTotals,
+    deposits,
+    recentTransactions,
+    topWallets
+  ] = await Promise.all([
+    pool.query("SELECT COUNT(*)::int AS count FROM users"),
+    pool.query("SELECT COUNT(*)::int AS count FROM user_rentals WHERE status='active'"),
+    pool.query("SELECT COUNT(*)::int AS count FROM video_jobs"),
+    pool.query("SELECT COUNT(*)::int AS count FROM showcase_uploads"),
+    pool.query("SELECT COALESCE(SUM(total_price),0)::numeric(14,2) AS total FROM user_rentals"),
+    pool.query("SELECT COALESCE(SUM(balance),0)::numeric(14,2) AS total FROM wallet_accounts"),
+    pool.query("SELECT COALESCE(SUM(amount),0)::numeric(14,2) AS total FROM wallet_transactions WHERE tx_type='deposit' AND status='completed'"),
+    pool.query(
+      `SELECT wt.id, wt.tx_type, wt.amount, wt.status, wt.note, wt.created_at, u.email
+       FROM wallet_transactions wt
+       JOIN users u ON u.id = wt.user_id
+       ORDER BY wt.created_at DESC
+       LIMIT 20`
+    ),
+    pool.query(
+      `SELECT wa.user_id, wa.balance, wa.currency, u.email
+       FROM wallet_accounts wa
+       JOIN users u ON u.id = wa.user_id
+       ORDER BY wa.balance DESC
+       LIMIT 10`
+    )
+  ])
+
+  return {
+    overview: {
+      total_users: users.rows[0].count,
+      active_rentals: activeRentals.rows[0].count,
+      total_video_jobs: jobs.rows[0].count,
+      total_uploads: uploads.rows[0].count,
+      rental_revenue_total: rentalsRevenue.rows[0].total,
+      wallet_balance_total: walletTotals.rows[0].total,
+      completed_deposit_total: deposits.rows[0].total
+    },
+    recent_wallet_transactions: recentTransactions.rows,
+    top_wallet_accounts: topWallets.rows
+  }
+}
+
+app.get("/admin/meta-dashboard", auth, adminOnly, asyncHandler(async (_req, res) => {
+  res.json(await getMetaDashboardPayload())
+}))
+
+app.get("/admin/master-meta-dashboard", auth, adminOnly, asyncHandler(async (_req, res) => {
+  res.json(await getMetaDashboardPayload())
+}))
+
+
 app.get("/admin/users", auth, adminOnly, asyncHandler(async (_req, res) => {
   const data = await pool.query("SELECT id, email, role, plan, created_at FROM users ORDER BY created_at DESC")
   res.json(data.rows)
@@ -432,4 +614,5 @@ app.use((error, _req, res, _next) => {
   res.status(status).json({ error: status >= 500 ? "Internal server error" : error.message })
 })
 
+app.listen(PORT, () => console.log(`Backend running on ${PORT} | ${RELEASE_NAME} v${RELEASE_VERSION}`))
 app.listen(PORT, () => console.log(`Backend running on ${PORT}`))

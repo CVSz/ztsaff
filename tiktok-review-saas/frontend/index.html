@@ -58,6 +58,9 @@
       <span class="chip">Admin Panel</span>
       <span class="chip">Rent Feature</span>
       <span class="chip">n8n Upgrade</span>
+      <span class="chip">Wallet</span>
+      <span class="chip">Master Meta Dashboard</span>
+      <span class="chip">Final Release v1.0.0</span>
     </div>
   </div>
 
@@ -71,6 +74,19 @@
       </div>
 
       <div class="card">
+        <h2 class="section-title">Release Control</h2>
+        <p class="hint">Final-release checks for backend availability and published release metadata.</p>
+        <div class="row">
+          <button onclick="loadReleaseInfo()">Release Info</button>
+          <button onclick="checkHealth()">Health Check</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="section-title">1) Auth</h2>
+        <div class="row">
+          <input id="email" placeholder="email" value="demo@example.com" />
+          <input id="password" placeholder="password (min 8 chars)" type="password" value="12345678" />
         <h2 class="section-title">1) Auth</h2>
         <div class="row">
           <input id="email" placeholder="email" value="demo@example.com" />
@@ -123,6 +139,21 @@
       </div>
 
       <div class="card">
+        <h2 class="section-title">4) Wallet & Deposit</h2>
+        <p class="hint">Add balance via deposit simulation and monitor wallet transactions.</p>
+        <div class="row">
+          <button onclick="loadWallet()">My Wallet</button>
+          <button onclick="loadWalletTransactions()">Wallet Transactions</button>
+        </div>
+        <div class="row">
+          <input id="depositAmount" type="number" min="1" step="1" value="100" placeholder="deposit amount" />
+          <input id="depositNote" placeholder="deposit note" value="Top-up for campaign" />
+        </div>
+        <button class="ok" onclick="depositWallet()">Deposit Wallet</button>
+      </div>
+
+      <div class="card">
+        <h2 class="section-title">5) Deep Learn + n8n Upgrade</h2>
         <h2 class="section-title">4) Deep Learn + n8n Upgrade</h2>
         <p class="hint">Create a richer AI prompt strategy and push payload to your n8n webhook for downstream automations.</p>
         <select id="learningDepth">
@@ -141,10 +172,15 @@
       </div>
 
       <div class="card">
+        <h2 class="section-title">6) Admin Control Panel</h2>
         <h2 class="section-title">5) Admin Control Panel</h2>
         <div class="row">
           <button onclick="loadAdminDashboard()">Admin Dashboard</button>
           <button onclick="loadAdminUsers()">List Users</button>
+        </div>
+        <div class="row">
+          <button onclick="loadAdminRentals()">List All Rentals</button>
+          <button class="warn" onclick="loadMasterMetaDashboard()">Master Meta Dashboard</button>
         </div>
         <button onclick="loadAdminRentals()">List All Rentals</button>
         <div class="row">
@@ -227,6 +263,8 @@
     async function loadProducts() { try { show(await request("/products")); return true } catch (e) { show(e); return false } }
     async function loadVideoJobs() { try { show(await request("/video-jobs")); return true } catch (e) { show(e); return false } }
     async function loadUploads() { try { show(await request("/showcase/uploads")); return true } catch (e) { show(e); return false } }
+    async function loadReleaseInfo() { try { show(await request("/release/info")); return true } catch (e) { show(e); return false } }
+    async function checkHealth() { try { show(await request("/health")); return true } catch (e) { show(e); return false } }
 
     async function subscribePlan() {
       try {
@@ -254,9 +292,37 @@
       } catch (e) { show(e); return false }
     }
 
+    async function loadWallet() { try { show(await request("/wallet")); return true } catch (e) { show(e); return false } }
+    async function loadWalletTransactions() { try { show(await request("/wallet/transactions")); return true } catch (e) { show(e); return false } }
+
+    async function depositWallet() {
+      try {
+        show(await request("/wallet/deposit", "POST", {
+          amount: Number(depositAmount.value || 0),
+          note: depositNote.value
+        }))
+        return true
+      } catch (e) { show(e); return false }
+    }
+
     async function loadAdminDashboard() { try { show(await request("/admin/dashboard")); return true } catch (e) { show(e); return false } }
     async function loadAdminUsers() { try { show(await request("/admin/users")); return true } catch (e) { show(e); return false } }
     async function loadAdminRentals() { try { show(await request("/admin/rentals")); return true } catch (e) { show(e); return false } }
+    async function loadMasterMetaDashboard() {
+      try {
+        show(await request("/admin/master-meta-dashboard"));
+        return true;
+      } catch (e) {
+        updateStatus("Master meta dashboard failed, trying fallback meta dashboard...", true);
+        try {
+          show(await request("/admin/meta-dashboard"));
+          return true;
+        } catch (e2) {
+          show(e2);
+          return false;
+        }
+      }
+    }
 
     async function changeUserRole() {
       try { show(await request(`/admin/users/${Number(targetUserId.value)}/role`, "POST", { role: targetRole.value })); return true } catch (e) { show(e); return false }
@@ -312,6 +378,36 @@
       }
 
       try {
+      try {
+        webhookUrl = new URL(webhook)
+      } catch (_e) {
+        updateStatus("invalid n8n webhook URL", true)
+        show({ error: "invalid n8n webhook URL" })
+        return
+      }
+
+      const isLocal = ["localhost", "127.0.0.1"].includes(webhookUrl.hostname)
+      if (webhookUrl.protocol !== "https:" && !isLocal) {
+        updateStatus("n8n webhook must use HTTPS", true)
+        show({ error: "n8n webhook must use HTTPS" })
+        return
+      }
+
+      const payload = {
+        source: "tiktok-review-saas-frontend",
+        tag: n8nTag.value.trim() || "tiktok-review-automation",
+        timestamp: new Date().toISOString(),
+        user: { email: email.value },
+        context: {
+          learningDepth: learningDepth.value,
+          learningPrompt: learningPrompt.value,
+          planCode: planCode.value,
+          planMonths: Number(planMonths.value || 1),
+          caption: caption.value
+        }
+      }
+
+      try {
         updateStatus("POST n8n webhook ...")
         const controller = new AbortController()
         const timeoutId = setTimeout(() => controller.abort(), 10000)
@@ -326,6 +422,27 @@
         const details = e.name === "AbortError" ? "request timeout after 10s" : e.message
         show({ error: "n8n webhook failed", details, payload })
       }
+    }
+
+    async function runDemoFlow() {
+      updateStatus("Running demo flow...")
+      await loadReleaseInfo()
+      const registered = await registerUser();
+      if (!registered) updateStatus("Registration failed, trying login...", true);
+
+      const loggedIn = await loginUser()
+      if (!loggedIn) {
+        updateStatus("Demo flow stopped at login", true)
+        return
+      }
+
+      await listRentPlans()
+      await loadUserDashboard()
+      await loadWallet()
+      updateStatus("Demo flow completed")
+    }
+
+    const fields = ["email", "planCode", "planMonths", "caption", "productsJson", "learningDepth", "learningPrompt", "n8nWebhook", "n8nTag", "depositAmount", "depositNote"]
     }
 
     async function runDemoFlow() {

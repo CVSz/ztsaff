@@ -92,3 +92,28 @@ VALUES
   ('starter', 'Starter', 299, 30, 'Basic AI script + video package generation'),
   ('growth', 'Growth', 999, 150, 'Priority generation + richer storyboard'),
   ('pro', 'Pro', 2499, 1000, 'Team-ready scaling + advanced automation');
+
+
+CREATE TABLE wallet_accounts (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER UNIQUE REFERENCES users(id),
+  balance NUMERIC(14,2) NOT NULL DEFAULT 0,
+  currency VARCHAR(12) NOT NULL DEFAULT 'THB',
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE wallet_transactions (
+  id SERIAL PRIMARY KEY,
+  wallet_id INTEGER REFERENCES wallet_accounts(id),
+  user_id INTEGER REFERENCES users(id),
+  tx_type VARCHAR(30) NOT NULL,
+  amount NUMERIC(14,2) NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'completed',
+  note VARCHAR(255),
+  metadata JSONB,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_wallet_transactions_wallet_id ON wallet_transactions(wallet_id, created_at DESC);
+CREATE INDEX idx_wallet_transactions_user_id ON wallet_transactions(user_id, created_at DESC);
