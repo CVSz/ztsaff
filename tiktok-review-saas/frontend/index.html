@@ -5,178 +5,388 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AI TikTok Review Studio</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 1080px; margin: 0 auto; padding: 24px; background: #f5f7fb; }
-    .card { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
-    input, textarea, button, select { width: 100%; margin-top: 8px; padding: 10px; box-sizing: border-box; }
-    button { cursor: pointer; background: #111; color: #fff; border: 0; border-radius: 6px; }
+    :root {
+      --bg: #f3f6fd;
+      --card: #ffffff;
+      --line: #dbe3f0;
+      --text: #1a2233;
+      --muted: #61708a;
+      --brand: #1f6fff;
+      --brand-soft: #e9f0ff;
+      --ok: #1a8f46;
+      --warn: #ca6a04;
+      --danger: #d21d1d;
+    }
+
+    body { font-family: Inter, Segoe UI, Arial, sans-serif; max-width: 1160px; margin: 0 auto; padding: 24px; background: var(--bg); color: var(--text); }
+    .hero { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .hero h1 { margin: 0; }
+    .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+    .chip { background: var(--brand-soft); color: #0d4ec7; border-radius: 999px; padding: 6px 10px; font-size: 12px; font-weight: 700; }
+
+    .layout { display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; align-items: start; }
+    .stack { display: grid; gap: 16px; }
+
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; box-shadow: 0 2px 10px rgba(17, 23, 43, 0.04); }
+    input, textarea, button, select { width: 100%; margin-top: 8px; padding: 10px; box-sizing: border-box; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; }
+    button { cursor: pointer; background: var(--brand); color: #fff; border: 0; font-weight: 600; transition: transform .15s ease; }
+    button:hover { transform: translateY(-1px); }
+    button.ghost { background: #fff; color: var(--text); border: 1px solid var(--line); }
+    button.ok { background: var(--ok); }
+    button.warn { background: var(--warn); }
+
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .section-title { margin: 0; }
-    pre { background: #111; color: #0f0; padding: 12px; overflow: auto; border-radius: 6px; min-height: 180px; }
+    .hint { margin: 4px 0 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
+
+    .status { margin-top: 8px; padding: 8px 10px; background: #eef4ff; border: 1px dashed #bfd2ff; border-radius: 8px; font-size: 13px; color: #2e4f89; }
+    .status.error { background: #fff1f1; border-color: #ffbdbd; color: #9d1919; }
+    .toolbar { display: flex; gap: 8px; margin-top: 10px; }
+    pre { background: #111827; color: #a3f8a9; padding: 12px; overflow: auto; border-radius: 8px; min-height: 330px; margin: 8px 0 0; }
+
+    @media (max-width: 900px) { .layout, .row { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
-  <h1>AI TikTok Review Studio</h1>
-  <p>Now includes <b>User Control Panel</b>, <b>Admin Control Panel</b>, and <b>Rent feature</b> for subscription plans.</p>
-
-  <div class="card">
-    <h2 class="section-title">1) Auth</h2>
-    <div class="row">
-      <input id="email" placeholder="email" value="demo@example.com" />
-      <input id="password" placeholder="password" type="password" value="123456" />
+  <div class="hero">
+    <div>
+      <h1>AI TikTok Review Studio</h1>
+      <p>Advanced, but easy to use — now with Deep Learn prompt mode and n8n automation trigger.</p>
     </div>
-    <input id="adminKey" placeholder="admin bootstrap key (optional for admin register)" />
-    <div class="row">
-      <button onclick="registerUser()">Register</button>
-      <button onclick="loginUser()">Login</button>
+    <div class="chips">
+      <span class="chip">User Panel</span>
+      <span class="chip">Admin Panel</span>
+      <span class="chip">Rent Feature</span>
+      <span class="chip">n8n Upgrade</span>
+      <span class="chip">Wallet</span>
+      <span class="chip">Master Meta Dashboard</span>
     </div>
   </div>
 
-  <div class="card">
-    <h2 class="section-title">2) Rent feature (User)</h2>
-    <div class="row">
-      <button onclick="listRentPlans()">List Rent Plans</button>
-      <button onclick="loadMyRentals()">My Rentals</button>
-    </div>
-    <div class="row">
-      <input id="planCode" placeholder="plan code: starter | growth | pro" value="starter" />
-      <input id="planMonths" type="number" min="1" value="1" placeholder="months" />
-    </div>
-    <button onclick="subscribePlan()">Subscribe Plan (Rent)</button>
-  </div>
+  <div class="layout">
+    <div class="stack">
+      <div class="card">
+        <h2 class="section-title">Quick Start</h2>
+        <p class="hint">Use one click to run onboarding and dashboard checks. If user exists already, flow continues with login.</p>
+        <button class="ok" onclick="runDemoFlow()">Run Smart Demo Flow</button>
+        <div id="status" class="status">Status: Ready</div>
+      </div>
 
-  <div class="card">
-    <h2 class="section-title">3) User Control Panel</h2>
-    <div class="row">
-      <button onclick="loadUserDashboard()">Load User Dashboard</button>
-      <button onclick="loadProducts()">My Products</button>
-    </div>
-    <textarea id="productsJson" rows="6">[
+      <div class="card">
+        <h2 class="section-title">1) Auth</h2>
+        <div class="row">
+          <input id="email" placeholder="email" value="demo@example.com" />
+          <input id="password" placeholder="password" type="password" value="123456" />
+        </div>
+        <input id="adminKey" placeholder="admin bootstrap key (optional for admin register)" />
+        <div class="row">
+          <button onclick="registerUser()">Register</button>
+          <button onclick="loginUser()">Login</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="section-title">2) Rent feature (User)</h2>
+        <div class="row">
+          <button onclick="listRentPlans()">List Rent Plans</button>
+          <button onclick="loadMyRentals()">My Rentals</button>
+        </div>
+        <div class="row">
+          <input id="planCode" placeholder="plan code: starter | growth | pro" value="starter" />
+          <input id="planMonths" type="number" min="1" value="1" placeholder="months" />
+        </div>
+        <button onclick="subscribePlan()">Subscribe Plan (Rent)</button>
+      </div>
+
+      <div class="card">
+        <h2 class="section-title">3) User Control Panel</h2>
+        <div class="row">
+          <button onclick="loadUserDashboard()">Load User Dashboard</button>
+          <button onclick="loadProducts()">My Products</button>
+        </div>
+        <textarea id="productsJson" rows="6">[
   {"id":"sku001","title":"Vitamin C Serum","category":"beauty","price":199,"currency":"THB"},
   {"id":"sku002","title":"Mini Blender","category":"kitchen","price":499,"currency":"THB"}
 ]</textarea>
-    <button onclick="importFeed()">Import TikTok Shop Affiliate Feed</button>
-    <div class="row">
-      <input id="productDbId" placeholder="Product DB id (e.g. 1)" />
-      <input id="videoJobId" placeholder="Video Job id" />
-    </div>
-    <div class="row">
-      <button onclick="generateVideo()">Generate Video Package</button>
-      <button onclick="loadVideoJobs()">My Video Jobs</button>
-    </div>
-    <input id="caption" placeholder="caption" value="ของดีบอกต่อจาก TikTok Shop" />
-    <div class="row">
-      <button onclick="uploadShowcase()">Upload to Showcase</button>
-      <button onclick="loadUploads()">My Showcase Uploads</button>
-    </div>
-  </div>
+        <button onclick="importFeed()">Import TikTok Shop Affiliate Feed</button>
+        <div class="row">
+          <input id="productDbId" placeholder="Product DB id (e.g. 1)" />
+          <input id="videoJobId" placeholder="Video Job id" />
+        </div>
+        <div class="row">
+          <button onclick="generateVideo()">Generate Video Package</button>
+          <button onclick="loadVideoJobs()">My Video Jobs</button>
+        </div>
+        <input id="caption" placeholder="caption" value="ของดีบอกต่อจาก TikTok Shop" />
+        <div class="row">
+          <button onclick="uploadShowcase()">Upload to Showcase</button>
+          <button onclick="loadUploads()">My Showcase Uploads</button>
+        </div>
+      </div>
 
-  <div class="card">
-    <h2 class="section-title">4) Admin Control Panel</h2>
-    <div class="row">
-      <button onclick="loadAdminDashboard()">Admin Dashboard</button>
-      <button onclick="loadAdminUsers()">List Users</button>
-    </div>
-    <button onclick="loadAdminRentals()">List All Rentals</button>
-    <div class="row">
-      <input id="targetUserId" placeholder="target user id" />
-      <select id="targetRole">
-        <option value="user">user</option>
-        <option value="admin">admin</option>
-      </select>
-    </div>
-    <button onclick="changeUserRole()">Change User Role</button>
-  </div>
+      <div class="card">
+        <h2 class="section-title">4) Wallet & Deposit</h2>
+        <p class="hint">Add balance via deposit simulation and monitor wallet transactions.</p>
+        <div class="row">
+          <button onclick="loadWallet()">My Wallet</button>
+          <button onclick="loadWalletTransactions()">Wallet Transactions</button>
+        </div>
+        <div class="row">
+          <input id="depositAmount" type="number" min="1" step="1" value="100" placeholder="deposit amount" />
+          <input id="depositNote" placeholder="deposit note" value="Top-up for campaign" />
+        </div>
+        <button class="ok" onclick="depositWallet()">Deposit Wallet</button>
+      </div>
 
-  <div class="card">
-    <h2 class="section-title">Output</h2>
-    <pre id="out">Ready</pre>
+      <div class="card">
+        <h2 class="section-title">5) Deep Learn + n8n Upgrade</h2>
+        <p class="hint">Create a richer AI prompt strategy and push payload to your n8n webhook for downstream automations.</p>
+        <select id="learningDepth">
+          <option value="normal">Normal learning</option>
+          <option value="deep" selected>Deep learning (more context + hooks)</option>
+        </select>
+        <textarea id="learningPrompt" rows="5" placeholder="AI learning prompt"></textarea>
+        <div class="row">
+          <input id="n8nWebhook" placeholder="n8n webhook URL (https://.../webhook/...)" />
+          <input id="n8nTag" placeholder="workflow tag" value="tiktok-review-automation" />
+        </div>
+        <div class="row">
+          <button class="warn" onclick="buildLearningTemplate()">Build Deep Learn Template</button>
+          <button onclick="sendToN8n()">Send to n8n</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="section-title">6) Admin Control Panel</h2>
+        <div class="row">
+          <button onclick="loadAdminDashboard()">Admin Dashboard</button>
+          <button onclick="loadAdminUsers()">List Users</button>
+        </div>
+        <div class="row">
+          <button onclick="loadAdminRentals()">List All Rentals</button>
+          <button class="warn" onclick="loadMasterMetaDashboard()">Master Meta Dashboard</button>
+        </div>
+        <div class="row">
+          <input id="targetUserId" placeholder="target user id" />
+          <select id="targetRole">
+            <option value="user">user</option>
+            <option value="admin">admin</option>
+          </select>
+        </div>
+        <button onclick="changeUserRole()">Change User Role</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="section-title">Output</h2>
+      <div class="toolbar">
+        <button class="ghost" onclick="copyOutput()">Copy Output</button>
+        <button class="ghost" onclick="clearOutput()">Clear</button>
+      </div>
+      <pre id="out">Ready</pre>
+    </div>
   </div>
 
   <script>
     const API = "http://localhost:4000"
     let token = ""
 
-    function show(data) {
-      document.getElementById("out").textContent = JSON.stringify(data, null, 2)
+    function show(data) { document.getElementById("out").textContent = JSON.stringify(data, null, 2) }
+
+    function updateStatus(message, isError = false) {
+      const el = document.getElementById("status")
+      el.textContent = `Status: ${message}`
+      el.classList.toggle("error", isError)
+    }
+
+    function clearOutput() { document.getElementById("out").textContent = "" }
+
+    async function copyOutput() {
+      try {
+        await navigator.clipboard.writeText(document.getElementById("out").textContent)
+        updateStatus("Output copied to clipboard")
+      } catch (_e) {
+        updateStatus("Clipboard blocked by browser security", true)
+      }
     }
 
     async function request(path, method = "GET", body) {
+      updateStatus(`${method} ${path} ...`)
       const headers = { "Content-Type": "application/json" }
       if (token) headers.Authorization = `Bearer ${token}`
       const r = await fetch(`${API}${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined })
       let data
-      try {
-        data = await r.json()
-      } catch (_e) {
-        data = { error: "Invalid JSON response" }
+      try { data = await r.json() } catch (_e) { data = { error: "Invalid JSON response" } }
+      if (!r.ok) {
+        updateStatus(`${method} ${path} failed`, true)
+        throw data
       }
-      if (!r.ok) throw data
+      updateStatus(`${method} ${path} success`)
       return data
     }
 
     async function registerUser() {
-      try {
-        const body = { email: email.value, password: password.value }
-        if (adminKey.value.trim()) body.adminKey = adminKey.value.trim()
-        show(await request("/register", "POST", body))
-      } catch (e) { show(e) }
+      const body = { email: email.value, password: password.value }
+      if (adminKey.value.trim()) body.adminKey = adminKey.value.trim()
+      try { show(await request("/register", "POST", body)); return true } catch (e) { show(e); return false }
     }
 
     async function loginUser() {
       try {
         const data = await request("/login", "POST", { email: email.value, password: password.value })
         token = data.token
-        show({ message: "login success", role: data.role, token })
-      } catch (e) { show(e) }
+        show({ message: "login success", role: data.role, tokenPreview: `${token.slice(0, 16)}...` })
+        return true
+      } catch (e) { show(e); return false }
     }
 
-    async function listRentPlans() { try { show(await request("/rent/plans")) } catch (e) { show(e) } }
-    async function loadMyRentals() { try { show(await request("/me/rentals")) } catch (e) { show(e) } }
-    async function loadUserDashboard() { try { show(await request("/user/dashboard")) } catch (e) { show(e) } }
-    async function loadProducts() { try { show(await request("/products")) } catch (e) { show(e) } }
-    async function loadVideoJobs() { try { show(await request("/video-jobs")) } catch (e) { show(e) } }
-    async function loadUploads() { try { show(await request("/showcase/uploads")) } catch (e) { show(e) } }
+    async function listRentPlans() { try { show(await request("/rent/plans")); return true } catch (e) { show(e); return false } }
+    async function loadMyRentals() { try { show(await request("/me/rentals")); return true } catch (e) { show(e); return false } }
+    async function loadUserDashboard() { try { show(await request("/user/dashboard")); return true } catch (e) { show(e); return false } }
+    async function loadProducts() { try { show(await request("/products")); return true } catch (e) { show(e); return false } }
+    async function loadVideoJobs() { try { show(await request("/video-jobs")); return true } catch (e) { show(e); return false } }
+    async function loadUploads() { try { show(await request("/showcase/uploads")); return true } catch (e) { show(e); return false } }
 
     async function subscribePlan() {
       try {
-        show(await request("/rent/subscribe", "POST", {
-          planCode: planCode.value.trim(),
-          months: Number(planMonths.value || 1)
-        }))
-      } catch (e) { show(e) }
+        show(await request("/rent/subscribe", "POST", { planCode: planCode.value.trim(), months: Number(planMonths.value || 1) }))
+        return true
+      } catch (e) { show(e); return false }
     }
 
     async function importFeed() {
       try {
         const products = JSON.parse(productsJson.value)
         show(await request("/product-feed/import", "POST", { feedName: "Demo Feed", products }))
-      } catch (e) { show(e) }
+        return true
+      } catch (e) { show(e); return false }
     }
 
     async function generateVideo() {
-      try {
-        show(await request("/video/generate-from-feed", "POST", { productDbId: Number(productDbId.value) }))
-      } catch (e) { show(e) }
+      try { show(await request("/video/generate-from-feed", "POST", { productDbId: Number(productDbId.value) })); return true } catch (e) { show(e); return false }
     }
 
     async function uploadShowcase() {
       try {
-        show(await request("/showcase/upload", "POST", {
-          videoJobId: Number(videoJobId.value),
-          caption: caption.value
-        }))
-      } catch (e) { show(e) }
+        show(await request("/showcase/upload", "POST", { videoJobId: Number(videoJobId.value), caption: caption.value }))
+        return true
+      } catch (e) { show(e); return false }
     }
 
-    async function loadAdminDashboard() { try { show(await request("/admin/dashboard")) } catch (e) { show(e) } }
-    async function loadAdminUsers() { try { show(await request("/admin/users")) } catch (e) { show(e) } }
-    async function loadAdminRentals() { try { show(await request("/admin/rentals")) } catch (e) { show(e) } }
+    async function loadWallet() { try { show(await request("/wallet")); return true } catch (e) { show(e); return false } }
+    async function loadWalletTransactions() { try { show(await request("/wallet/transactions")); return true } catch (e) { show(e); return false } }
+
+    async function depositWallet() {
+      try {
+        show(await request("/wallet/deposit", "POST", {
+          amount: Number(depositAmount.value || 0),
+          note: depositNote.value
+        }))
+        return true
+      } catch (e) { show(e); return false }
+    }
+
+    async function loadAdminDashboard() { try { show(await request("/admin/dashboard")); return true } catch (e) { show(e); return false } }
+    async function loadAdminUsers() { try { show(await request("/admin/users")); return true } catch (e) { show(e); return false } }
+    async function loadAdminRentals() { try { show(await request("/admin/rentals")); return true } catch (e) { show(e); return false } }
+    async function loadMasterMetaDashboard() { try { show(await request("/admin/meta-dashboard")); return true } catch (e) { show(e); return false } }
 
     async function changeUserRole() {
-      try {
-        show(await request(`/admin/users/${Number(targetUserId.value)}/role`, "POST", { role: targetRole.value }))
-      } catch (e) { show(e) }
+      try { show(await request(`/admin/users/${Number(targetUserId.value)}/role`, "POST", { role: targetRole.value })); return true } catch (e) { show(e); return false }
     }
+
+    function buildLearningTemplate() {
+      const deep = learningDepth.value === "deep"
+      const template = deep
+        ? `Goal: Learn product deeply and generate high-converting TikTok review assets.\n\nAnalyze:\n- Target customer pain points\n- Market alternatives and differentiation\n- Objection handling\n- Emotional and rational hooks\n\nOutput:\n1) 3 hook variants\n2) 1 long script + 2 short script versions\n3) Storyboard with timestamps\n4) CTA + hashtag strategy\n5) A/B test ideas for first 3 seconds`
+        : `Goal: Create a concise TikTok review plan with a clear hook, benefits, and CTA.`
+
+      learningPrompt.value = template
+      updateStatus("Deep Learn template generated")
+      show({ learningDepth: learningDepth.value, learningPrompt: template })
+    }
+
+    async function sendToN8n() {
+      const webhook = n8nWebhook.value.trim()
+      if (!webhook) {
+        updateStatus("n8n webhook URL is required", true)
+        show({ error: "n8n webhook URL is required" })
+        return
+      }
+
+      let webhookUrl
+      try {
+        webhookUrl = new URL(webhook)
+      } catch (_e) {
+        updateStatus("invalid n8n webhook URL", true)
+        show({ error: "invalid n8n webhook URL" })
+        return
+      }
+
+      const isLocal = ["localhost", "127.0.0.1"].includes(webhookUrl.hostname)
+      if (webhookUrl.protocol !== "https:" && !isLocal) {
+        updateStatus("n8n webhook must use HTTPS", true)
+        show({ error: "n8n webhook must use HTTPS" })
+        return
+      }
+
+      const payload = {
+        source: "tiktok-review-saas-frontend",
+        tag: n8nTag.value.trim() || "tiktok-review-automation",
+        timestamp: new Date().toISOString(),
+        user: { email: email.value },
+        context: {
+          learningDepth: learningDepth.value,
+          learningPrompt: learningPrompt.value,
+          planCode: planCode.value,
+          planMonths: Number(planMonths.value || 1),
+          caption: caption.value
+        }
+      }
+
+      try {
+        updateStatus("POST n8n webhook ...")
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 10000)
+        const r = await fetch(webhookUrl.toString(), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), signal: controller.signal })
+        clearTimeout(timeoutId)
+        const txt = await r.text()
+        if (!r.ok) throw new Error(txt || "n8n request failed")
+        updateStatus("n8n webhook sent successfully")
+        try { show({ ok: true, response: JSON.parse(txt), payload }) } catch (_e) { show({ ok: true, response: txt, payload }) }
+      } catch (e) {
+        updateStatus("n8n webhook failed", true)
+        const details = e.name === "AbortError" ? "request timeout after 10s" : e.message
+        show({ error: "n8n webhook failed", details, payload })
+      }
+    }
+
+    async function runDemoFlow() {
+      updateStatus("Running demo flow...")
+      const registered = await registerUser()
+      if (!registered) updateStatus("Register skipped/failed, trying login...")
+
+      const loggedIn = await loginUser()
+      if (!loggedIn) {
+        updateStatus("Demo flow stopped at login", true)
+        return
+      }
+
+      await listRentPlans()
+      await loadUserDashboard()
+      await loadWallet()
+      updateStatus("Demo flow completed")
+    }
+
+    const fields = ["email", "planCode", "planMonths", "caption", "productsJson", "learningDepth", "learningPrompt", "n8nWebhook", "n8nTag", "depositAmount", "depositNote"]
+    fields.forEach((id) => {
+      const el = document.getElementById(id)
+      const saved = localStorage.getItem(`ui:${id}`)
+      if (saved) el.value = saved
+      el.addEventListener("input", () => localStorage.setItem(`ui:${id}`, el.value))
+    })
+
+    if (!learningPrompt.value.trim()) buildLearningTemplate()
   </script>
 </body>
 </html>
