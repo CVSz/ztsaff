@@ -11,8 +11,8 @@ const PORT = Number(process.env.PORT || 4000)
 const JWT_SECRET = process.env.JWT_SECRET
 const DATABASE_URL = process.env.DATABASE_URL
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN
-const RELEASE_VERSION = process.env.RELEASE_VERSION || process.env.npm_package_version || "1.0.0"
-const RELEASE_NAME = process.env.RELEASE_NAME || "Final Release"
+const RELEASE_VERSION = process.env.RELEASE_VERSION || process.env.npm_package_version || "1.0.0";
+const RELEASE_NAME = process.env.RELEASE_NAME || "Final Release";
 
 if (!JWT_SECRET) throw new Error("JWT_SECRET is required")
 if (!DATABASE_URL) throw new Error("DATABASE_URL is required")
