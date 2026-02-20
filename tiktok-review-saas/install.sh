@@ -54,9 +54,9 @@ install_compose_fallback() {
 
 start_stack() {
   if docker compose version >/dev/null 2>&1; then
-    docker compose -f "$COMPOSE_FILE" up -d --build
+    $SUDO docker compose -f "$COMPOSE_FILE" up -d --build
   else
-    docker-compose -f "$COMPOSE_FILE" up -d --build
+    $SUDO docker-compose -f "$COMPOSE_FILE" up -d --build
   fi
 }
 
