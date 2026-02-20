@@ -390,8 +390,8 @@
     async function runDemoFlow() {
       updateStatus("Running demo flow...")
       await loadReleaseInfo()
-      const registered = await registerUser()
-      if (!registered) updateStatus("Register skipped/failed, trying login...")
+      const registered = await registerUser();
+      if (!registered) updateStatus("Registration failed, trying login...", true);
 
       const loggedIn = await loginUser()
       if (!loggedIn) {
