@@ -251,19 +251,31 @@ app.post("/wallet/deposit", auth, asyncHandler(async (req, res) => {
   }
 
   const wallet = await ensureWallet(req.user.id)
-  const updated = await pool.query(
-    "UPDATE wallet_accounts SET balance = balance + $1, updated_at = NOW() WHERE id=$2 RETURNING *",
-    [amount, wallet.id]
-  )
+  const client = await pool.connect()
 
-  const tx = await pool.query(
-    `INSERT INTO wallet_transactions (wallet_id, user_id, tx_type, amount, status, note, metadata)
-     VALUES ($1,$2,'deposit',$3,'completed',$4,$5)
-     RETURNING *`,
-    [wallet.id, req.user.id, amount, note, JSON.stringify({ source: "user_deposit" })]
-  )
+  try {
+    await client.query("BEGIN")
 
-  res.json({ message: "Deposit success", wallet: updated.rows[0], transaction: tx.rows[0] })
+    const updated = await client.query(
+      "UPDATE wallet_accounts SET balance = balance + $1, updated_at = NOW() WHERE id=$2 RETURNING *",
+      [amount, wallet.id]
+    )
+
+    const tx = await client.query(
+      `INSERT INTO wallet_transactions (wallet_id, user_id, tx_type, amount, status, note, metadata)
+       VALUES ($1,$2,'deposit',$3,'completed',$4,$5)
+       RETURNING *`,
+      [wallet.id, req.user.id, amount, note, JSON.stringify({ source: "user_deposit" })]
+    )
+
+    await client.query("COMMIT")
+    res.json({ message: "Deposit success", wallet: updated.rows[0], transaction: tx.rows[0] })
+  } catch (error) {
+    await client.query("ROLLBACK")
+    throw error
+  } finally {
+    client.release()
+  }
 }))
 
 app.get("/wallet/transactions", auth, asyncHandler(async (req, res) => {
@@ -464,7 +476,7 @@ app.get("/admin/dashboard", auth, adminOnly, asyncHandler(async (_req, res) => {
   })
 }))
 
-app.get("/admin/meta-dashboard", auth, adminOnly, asyncHandler(async (_req, res) => {
+async function getMetaDashboardPayload() {
   const [
     users,
     activeRentals,
@@ -499,7 +511,7 @@ app.get("/admin/meta-dashboard", auth, adminOnly, asyncHandler(async (_req, res)
     )
   ])
 
-  res.json({
+  return {
     overview: {
       total_users: users.rows[0].count,
       active_rentals: activeRentals.rows[0].count,
@@ -511,7 +523,15 @@ app.get("/admin/meta-dashboard", auth, adminOnly, asyncHandler(async (_req, res)
     },
     recent_wallet_transactions: recentTransactions.rows,
     top_wallet_accounts: topWallets.rows
-  })
+  }
+}
+
+app.get("/admin/meta-dashboard", auth, adminOnly, asyncHandler(async (_req, res) => {
+  res.json(await getMetaDashboardPayload())
+}))
+
+app.get("/admin/master-meta-dashboard", auth, adminOnly, asyncHandler(async (_req, res) => {
+  res.json(await getMetaDashboardPayload())
 }))
 
 app.get("/admin/users", auth, adminOnly, asyncHandler(async (_req, res) => {

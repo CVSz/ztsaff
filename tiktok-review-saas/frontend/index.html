@@ -76,7 +76,7 @@
         <h2 class="section-title">1) Auth</h2>
         <div class="row">
           <input id="email" placeholder="email" value="demo@example.com" />
-          <input id="password" placeholder="password" type="password" value="123456" />
+          <input id="password" placeholder="password (min 8 chars)" type="password" value="12345678" />
         </div>
         <input id="adminKey" placeholder="admin bootstrap key (optional for admin register)" />
         <div class="row">
@@ -289,7 +289,20 @@
     async function loadAdminDashboard() { try { show(await request("/admin/dashboard")); return true } catch (e) { show(e); return false } }
     async function loadAdminUsers() { try { show(await request("/admin/users")); return true } catch (e) { show(e); return false } }
     async function loadAdminRentals() { try { show(await request("/admin/rentals")); return true } catch (e) { show(e); return false } }
-    async function loadMasterMetaDashboard() { try { show(await request("/admin/meta-dashboard")); return true } catch (e) { show(e); return false } }
+    async function loadMasterMetaDashboard() {
+      try {
+        show(await request("/admin/master-meta-dashboard"))
+        return true
+      } catch (e) {
+        try {
+          show(await request("/admin/meta-dashboard"))
+          return true
+        } catch (e2) {
+          show(e2)
+          return false
+        }
+      }
+    }
 
     async function changeUserRole() {
       try { show(await request(`/admin/users/${Number(targetUserId.value)}/role`, "POST", { role: targetRole.value })); return true } catch (e) { show(e); return false }
