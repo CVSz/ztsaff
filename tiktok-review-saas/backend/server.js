@@ -127,6 +127,8 @@ app.get("/release/info", (_req, res) => {
       wallet: "/wallet"
     }
   })
+app.get("/health", (_req, res) => {
+  res.json({ ok: true })
 })
 
 app.post("/register", authRateLimit, asyncHandler(async (req, res) => {
@@ -150,6 +152,8 @@ app.post("/register", authRateLimit, asyncHandler(async (req, res) => {
       [email, hash, role]
     )
     newUser = inserted.rows[0]
+  try {
+    await pool.query("INSERT INTO users (email,password_hash,role) VALUES ($1,$2,$3)", [email, hash, role])
   } catch (error) {
     if (error.code === "23505") return res.status(409).json({ error: "email already registered" })
     throw error
@@ -322,6 +326,12 @@ app.get("/rent/plans", auth, asyncHandler(async (_req, res) => {
   res.json(data.rows)
 }))
 
+
+app.get("/rent/plans", auth, asyncHandler(async (_req, res) => {
+  const data = await pool.query("SELECT code, name, monthly_price, max_video_jobs, perks FROM rental_plans WHERE active=TRUE ORDER BY monthly_price ASC")
+  res.json(data.rows)
+}))
+
 app.post("/rent/subscribe", auth, asyncHandler(async (req, res) => {
   const planCode = safeText(req.body.planCode, 50)
   const months = parsePositiveInt(req.body.months ?? 1, "months")
@@ -468,6 +478,11 @@ app.post("/showcase/upload", auth, asyncHandler(async (req, res) => {
   const videoJobId = parsePositiveInt(req.body.videoJobId, "videoJobId")
   const caption = safeText(req.body.caption || "", 500)
 
+
+app.post("/showcase/upload", auth, asyncHandler(async (req, res) => {
+  const videoJobId = parsePositiveInt(req.body.videoJobId, "videoJobId")
+  const caption = safeText(req.body.caption || "", 500)
+
   const video = await pool.query("SELECT id FROM video_jobs WHERE id=$1 AND user_id=$2", [videoJobId, req.user.id])
   if (!video.rows.length) return res.status(404).json({ error: "Video job not found" })
 
@@ -564,6 +579,7 @@ app.get("/admin/master-meta-dashboard", auth, adminOnly, asyncHandler(async (_re
   res.json(await getMetaDashboardPayload())
 }))
 
+
 app.get("/admin/users", auth, adminOnly, asyncHandler(async (_req, res) => {
   const data = await pool.query("SELECT id, email, role, plan, created_at FROM users ORDER BY created_at DESC")
   res.json(data.rows)
@@ -599,3 +615,4 @@ app.use((error, _req, res, _next) => {
 })
 
 app.listen(PORT, () => console.log(`Backend running on ${PORT} | ${RELEASE_NAME} v${RELEASE_VERSION}`))
+app.listen(PORT, () => console.log(`Backend running on ${PORT}`))
