@@ -15,6 +15,14 @@ if [[ "${EUID}" -ne 0 ]]; then
   SUDO="sudo"
 fi
 
+run_docker_cmd() {
+  if docker compose version >/dev/null 2>&1; then
+    $SUDO docker compose "$@"
+  else
+    $SUDO docker-compose "$@"
+  fi
+}
+
 install_docker() {
   if command -v docker >/dev/null 2>&1; then
     echo "✅ Docker already installed"
@@ -53,11 +61,6 @@ install_compose_fallback() {
   $SUDO apt-get install -y docker-compose
 }
 
-start_stack() {
-  if docker compose version >/dev/null 2>&1; then
-    $SUDO docker compose -f "$COMPOSE_FILE" up -d --build
-  else
-    $SUDO docker-compose -f "$COMPOSE_FILE" up -d --build
 generate_env_file() {
   if [[ -f "$ENV_FILE" ]]; then
     echo "✅ .env already exists"
@@ -87,11 +90,7 @@ EOT
 }
 
 start_stack() {
-  if docker compose version >/dev/null 2>&1; then
-    docker compose -f "$COMPOSE_FILE" up -d --build
-  else
-    docker-compose -f "$COMPOSE_FILE" up -d --build
-  fi
+  run_docker_cmd -f "$COMPOSE_FILE" up -d --build
 }
 
 main() {
