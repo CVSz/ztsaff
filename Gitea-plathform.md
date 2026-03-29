@@ -1,8 +1,3 @@
-# Meta Audit Gitea Script
-
-**User:** sea (sea@zeaz.dev)  
-**Link:** [https://chatgpt.com/c/69c919c6-c1b4-8323-8c9f-941355f82b84](https://chatgpt.com/c/69c919c6-c1b4-8323-8c9f-941355f82b84)  
-
 ## Prompt:
 meta deep audit script gitea with no cost
 #!/usr/bin/env bash
