@@ -1,0 +1,26 @@
+services:
+  redis:
+    image: redis:7-alpine
+
+  worker:
+    image: alpine:3
+    volumes:
+      - ./ephemeral-v5:/ephemeral
+      - /run/zgitea-installer:/run/zgitea-installer:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: sh -c "apk add --no-cache bash curl jq redis docker-cli && /ephemeral/worker-stream.sh"
+
+  webhook:
+    image: alpine:3
+    ports: ["127.0.0.1:8088:8088"]
+    volumes:
+      - ./ephemeral-v5:/ephemeral
+      - /run/zgitea-installer:/run/zgitea-installer:ro
+    command: sh -c "apk add --no-cache bash netcat-openbsd jq openssl redis && /ephemeral/webhook-stream.sh"
+
+  autoscaler:
+    image: alpine:3
+    volumes:
+      - ./ephemeral-v5:/ephemeral
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: sh -c "apk add --no-cache bash redis docker-cli && /ephemeral/autoscaler-stream.sh"

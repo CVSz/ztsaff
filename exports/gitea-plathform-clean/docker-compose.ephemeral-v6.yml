@@ -1,0 +1,35 @@
+services:
+  redis:
+    image: redis:7-alpine
+
+  spire-server:
+    image: ghcr.io/spiffe/spire-server:1.8
+    volumes:
+      - ./ephemeral-v6/spire-server.conf:/spire/conf/server.conf
+
+  spire-agent:
+    image: ghcr.io/spiffe/spire-agent:1.8
+    depends_on: [spire-server]
+    volumes:
+      - ./ephemeral-v6/spire-agent.conf:/spire/conf/agent.conf
+
+  worker:
+    image: alpine:3
+    volumes:
+      - ./ephemeral-v6:/ephemeral
+      - /run/zgitea-installer:/run/zgitea-installer:ro
+    command: sh -c "apk add --no-cache bash curl jq redis wasmtime && /ephemeral/worker-stream.sh"
+
+  webhook:
+    image: alpine:3
+    ports: ["127.0.0.1:8088:8088"]
+    volumes:
+      - ./ephemeral-v6:/ephemeral
+      - /run/zgitea-installer:/run/zgitea-installer:ro
+    command: sh -c "apk add --no-cache bash netcat-openbsd jq openssl redis && /ephemeral/webhook-stream.sh"
+
+  autoscaler:
+    image: alpine:3
+    volumes:
+      - ./ephemeral-v6:/ephemeral
+    command: sh -c "apk add --no-cache bash redis docker-cli && /ephemeral/autoscaler-stream.sh"

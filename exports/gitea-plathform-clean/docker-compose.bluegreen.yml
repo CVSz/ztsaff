@@ -1,0 +1,63 @@
+version: "3.9"
+
+x-gitea-env: &gitea_env
+  GITEA__database__DB_TYPE: postgres
+  GITEA__database__HOST: postgres:5432
+  GITEA__database__NAME: gitea
+  GITEA__database__USER: gitea
+  GITEA__database__PASSWD_FILE: /run/secrets/db_pass
+  GITEA__security__SECRET_KEY__FILE: /run/secrets/secret
+  GITEA__security__INTERNAL_TOKEN__FILE: /run/secrets/secret
+  GITEA__service__DISABLE_REGISTRATION: "true"
+  GITEA__security__INSTALL_LOCK: "true"
+
+services:
+  caddy:
+    image: caddy:2.7-alpine
+    ports: ["127.0.0.1:443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./state:/state
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs: [/tmp]
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: gitea
+      POSTGRES_DB: gitea
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_pass
+    volumes:
+      - /run/zttato:/run/secrets:ro
+      - db-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  gitea-blue:
+    image: gitea/gitea:1.21-rootless
+    environment: *gitea_env
+    volumes:
+      - /run/zttato:/run/secrets:ro
+      - gitea-blue-data:/var/lib/gitea
+    networks: [app]
+    restart: unless-stopped
+
+  gitea-green:
+    image: gitea/gitea:1.21-rootless
+    environment: *gitea_env
+    volumes:
+      - /run/zttato:/run/secrets:ro
+      - gitea-green-data:/var/lib/gitea
+    networks: [app]
+    restart: unless-stopped
+
+networks:
+  app:
+
+volumes:
+  db-data:
+  gitea-blue-data:
+  gitea-green-data:
