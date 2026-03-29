@@ -1,0 +1,16 @@
+zttato-gitea/
+├── docker-compose.yml
+├── Caddyfile
+├── scripts/
+│   ├── install.sh
+│   ├── backup.sh
+│   ├── autoheal.sh
+│   ├── snapshot.sh
+│   └── cloudflare.sh
+├── .github/
+│   └── workflows/
+│       ├── ci.yml
+│       └── deploy.yml
+├── .env.example
+├── Makefile
+└── README.md

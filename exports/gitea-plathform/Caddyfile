@@ -1,0 +1,20 @@
+{
+    admin off
+}
+
+https://localhost {
+    encode gzip
+
+    @blue {
+        expression `{file.read_string("/state/active")} == "blue"`
+    }
+
+    @green {
+        expression `{file.read_string("/state/active")} == "green"`
+    }
+
+    reverse_proxy @blue gitea-blue:3000
+    reverse_proxy @green gitea-green:3000
+
+    tls internal
+}
