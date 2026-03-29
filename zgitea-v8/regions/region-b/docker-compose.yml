@@ -1,0 +1,77 @@
+services:
+  region-b-redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "no"]
+    container_name: region-b-redis
+    ports: ["6380:6379"]
+
+  region-b-etcd:
+    image: quay.io/coreos/etcd:v3.5.18
+    container_name: region-b-etcd
+    command: ["/usr/local/bin/etcd", "--name=region-b-etcd", "--advertise-client-urls=http://0.0.0.0:2379", "--listen-client-urls=http://0.0.0.0:2379"]
+    ports: ["2380:2379"]
+
+  region-b-minio:
+    image: minio/minio:RELEASE.2025-02-28T09-55-16Z
+    container_name: region-b-minio
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER_FILE: /run/secrets/minio_root_user
+      MINIO_ROOT_PASSWORD_FILE: /run/secrets/minio_root_password
+    secrets: [minio_root_user, minio_root_password]
+    ports: ["9100:9000", "9101:9001"]
+
+  region-b-gateway:
+    image: python:3.12-slim
+    working_dir: /app
+    command: bash -lc "pip install -r requirements.txt && uvicorn ingress:app --host 0.0.0.0 --port 8080"
+    environment:
+      REGION: region-b
+      REDIS_HOST: region-b-redis
+    volumes: ["../../webhook:/app:ro"]
+    secrets: [webhook_hmac_key]
+    ports: ["28080:8080"]
+
+  region-b-scheduler:
+    image: python:3.12-slim
+    working_dir: /app
+    command: bash -lc "pip install -r requirements.txt && python scheduler.py"
+    environment:
+      REGION: region-b
+      REDIS_HOST: region-b-redis
+      ETCD_HOST: region-b-etcd
+    volumes: ["../../scheduler:/app:ro"]
+
+  region-b-worker:
+    image: python:3.12-slim
+    working_dir: /app
+    command: bash -lc "apt-get update && apt-get install -y --no-install-recommends wasmtime && pip install -r requirements.txt && python runner.py"
+    environment:
+      REGION: region-b
+      REDIS_HOST: region-b-redis
+      MINIO_ENDPOINT: http://region-b-minio:9000
+    volumes: ["../../worker:/app:ro"]
+    secrets: [artifact_key]
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true", "seccomp:../../shared/seccomp/worker-seccomp.json"]
+
+  region-b-autoscaler:
+    image: python:3.12-slim
+    working_dir: /app
+    command: bash -lc "pip install redis==6.0.0 && python autoscaler.py"
+    environment:
+      REGION: region-b
+      REDIS_HOST: region-b-redis
+    volumes: ["../../autoscaler:/app:ro"]
+
+secrets:
+  minio_root_user:
+    file: ../../secrets/minio_root_user
+  minio_root_password:
+    file: ../../secrets/minio_root_password
+  webhook_hmac_key:
+    file: ../../secrets/webhook_hmac_key
+  artifact_key:
+    file: ../../secrets/artifact_key
