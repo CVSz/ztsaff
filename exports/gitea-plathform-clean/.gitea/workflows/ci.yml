@@ -1,0 +1,13 @@
+name: ZGitea CI
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        run: echo "checkout"
+
+      - name: Run WASM Job
+        run: echo "execute wasm"

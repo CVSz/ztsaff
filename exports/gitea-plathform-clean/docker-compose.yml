@@ -1,0 +1,20 @@
+
+act_runner:
+  image: gitea/act_runner:latest
+  environment:
+    GITEA_INSTANCE_URL: http://gitea:3000
+    GITEA_RUNNER_REGISTRATION_TOKEN_FILE: /run/secrets/runner_token
+  volumes:
+    - ${SECRETS_DIR}:/run/secrets:ro
+  entrypoint: ["/bin/sh","-c"]
+  command: >
+    "
+    if [ ! -f /data/.runner ]; then
+      act_runner register \
+        --instance \$GITEA_INSTANCE_URL \
+        --token \$(cat /run/secrets/runner_token) \
+        --name zgitea-runner \
+        --labels docker,secure;
+    fi;
+    exec act_runner daemon;
+    "
