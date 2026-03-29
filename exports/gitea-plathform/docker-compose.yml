@@ -1,0 +1,19 @@
+services:
+  server:
+    image: gitea/gitea:1.21-rootless
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
+    environment:
+      GITEA__security__SECRET_KEY__FILE: /run/secrets/internal_token
+      GITEA__security__INTERNAL_TOKEN__FILE: /run/secrets/internal_token
+    volumes:
+      - type: bind
+        source: /run/zttato-secrets
+        target: /run/secrets
+        read_only: true
+    networks:
+      - app

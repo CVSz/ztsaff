@@ -1,0 +1,74 @@
+services:
+
+  gitea:
+    image: gitea/gitea:1.21-rootless
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: gitea
+      POSTGRES_DB: gitea
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_pass
+    volumes:
+      - ${SECRETS_DIR}:/run/secrets:ro
+      - postgres_data:/var/lib/postgresql/data
+    command:
+      - postgres
+      - -c
+      - shared_buffers=128MB
+      - -c
+      - synchronous_commit=on
+      - -c
+      - wal_sync_method=fdatasync
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gitea"]
+      interval: 5s
+      retries: 5
+
+  act_runner:
+    image: gitea/act_runner:latest
+    environment:
+      GITEA_INSTANCE_URL: http://gitea:3000
+      GITEA_RUNNER_REGISTRATION_TOKEN: REGISTER_TOKEN
+    runtime: ${RUNTIME:-runc}
+    read_only: true
+    mem_limit: 512m
+    security_opt:
+      - no-new-privileges:true
+      - seccomp:unconfined   # ⚠️ เปลี่ยนเป็น custom seccomp ถ้าจะ tighten เพิ่ม
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
+      - /var/tmp
+    networks:
+      - runner_net
+
+  prometheus:
+    image: prom/prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports: ["127.0.0.1:9090:9090"]
+
+  grafana:
+    image: grafana/grafana
+    ports: ["127.0.0.1:3001:3000"]
+
+  node-exporter:
+    image: prom/node-exporter
+    network_mode: host
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    ports: ["127.0.0.1:8080:8080"]
+
+networks:
+  runner_net:
+    internal: true
+
+volumes:
+  postgres_data:

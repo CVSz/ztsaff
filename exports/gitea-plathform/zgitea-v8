@@ -1,0 +1,37 @@
+zgitea-v8/
+├── prompt.md
+├── README.md
+├── .gitea/
+│   └── workflows/
+│       └── ci.yml
+├── edge/
+│   ├── router.sh
+│   └── latency-check.sh
+├── regions/
+│   ├── region-a/
+│   │   ├── docker-compose.yml
+│   │   ├── scheduler.sh
+│   │   ├── worker.sh
+│   │   ├── autoscaler.sh
+│   │   └── webhook.sh
+│   ├── region-b/
+│   │   └── (same as region-a)
+│   └── region-c/
+│       └── (optional)
+├── global/
+│   ├── replication.sh
+│   ├── failover.sh
+│   └── health.sh
+├── runtime/
+│   ├── spawn-runner-wasm.sh
+│   ├── seccomp.json
+│   └── cache-proxy.sh
+├── infra/
+│   ├── redis-cluster.yml
+│   ├── etcd-cluster.yml
+│   └── spire/
+│       ├── server.conf
+│       └── agent.conf
+└── scripts/
+    ├── install.sh
+    └── bootstrap.sh
